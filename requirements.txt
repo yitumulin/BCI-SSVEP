@@ -1,0 +1,11 @@
+brainflow
+pylsl==1.14.0
+numpy
+scipy
+matplotlib
+pyqtgraph
+mne
+scikit-learn
+pygame
+pandas
+openpyxl

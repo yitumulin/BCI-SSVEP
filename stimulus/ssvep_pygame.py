@@ -89,12 +89,14 @@ try:
         outlet.push_sample([f"TRIAL_END|{FREQS[target]}"], local_clock())
 
         # 休息期
+        outlet.push_sample(["REST_START"], local_clock())
         rest_t0 = time.time()
         while time.time() - rest_t0 < REST_LEN:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT: pygame.quit(); sys.exit(0)
             draw_targets([False, False, False, False])
             clock.tick(SCREEN_REFRESH)
+        outlet.push_sample(["REST_END"], local_clock())
 
     pygame.quit()
 except KeyboardInterrupt:

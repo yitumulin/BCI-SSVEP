@@ -8,6 +8,7 @@ import time
 import sys
 import os
 from pathlib import Path
+from datetime import datetime
 
 class BCIRunner:
     def __init__(self, root):
@@ -97,7 +98,7 @@ class BCIRunner:
         # 解码器类型
         ttk.Label(config_frame, text="解码器:").grid(row=0, column=2, sticky=tk.W)
         self.decoder_var = tk.StringVar(value="CCA+")
-        decoder_combo = ttk.Combobox(config_frame, textvariable=self.decoder_var, values=["CCA+", "FBCCA"], width=8, state="readonly")
+        decoder_combo = ttk.Combobox(config_frame, textvariable=self.decoder_var, values=["CCA+", "FBCCA", "Hybrid"], width=8, state="readonly")
         decoder_combo.grid(row=0, column=3, sticky=tk.W, padx=(5, 20))
         
         # 窗口长度
@@ -116,7 +117,7 @@ class BCIRunner:
         # 通道模式
         ttk.Label(config_frame, text="通道模式:").grid(row=2, column=0, sticky=tk.W)
         self.channel_var = tk.StringVar(value="子集通道")
-        channel_combo = ttk.Combobox(config_frame, textvariable=self.channel_var, values=["子集通道", "全通道"], width=12, state="readonly")
+        channel_combo = ttk.Combobox(config_frame, textvariable=self.channel_var, values=["子集通道", "全通道", "自动(QC)"], width=12, state="readonly")
         channel_combo.grid(row=2, column=1, sticky=tk.W, padx=(5, 20))
         
         # Notch 频率
@@ -131,14 +132,54 @@ class BCIRunner:
         ttk.Entry(config_frame, textvariable=self.logdir_var, width=30).grid(row=3, column=1, columnspan=2, sticky=(tk.W, tk.E), padx=(5, 5))
         ttk.Button(config_frame, text="浏览", command=self.browse_logdir).grid(row=3, column=3, sticky=tk.W, padx=(5, 0))
         
+        # 高级选项区域
+        advanced_frame = ttk.LabelFrame(config_frame, text="高级选项", padding="5")
+        advanced_frame.grid(row=4, column=0, columnspan=4, sticky=(tk.W, tk.E), pady=(10, 0))
+        
+        # 早停参数
+        self.earlystop_var = tk.BooleanVar(value=False)
+        ttk.Checkbutton(advanced_frame, text="启用早停", variable=self.earlystop_var).grid(row=0, column=0, sticky=tk.W)
+        
+        ttk.Label(advanced_frame, text="最小相关性:").grid(row=0, column=1, sticky=tk.W, padx=(10, 5))
+        self.rmin_var = tk.StringVar(value="0.45")
+        ttk.Entry(advanced_frame, textvariable=self.rmin_var, width=8).grid(row=0, column=2, sticky=tk.W)
+        
+        ttk.Label(advanced_frame, text="最小差距:").grid(row=0, column=3, sticky=tk.W, padx=(10, 5))
+        self.margin_var = tk.StringVar(value="0.15")
+        ttk.Entry(advanced_frame, textvariable=self.margin_var, width=8).grid(row=0, column=4, sticky=tk.W)
+        
+        ttk.Label(advanced_frame, text="耐心值:").grid(row=0, column=5, sticky=tk.W, padx=(10, 5))
+        self.patience_var = tk.StringVar(value="2")
+        ttk.Entry(advanced_frame, textvariable=self.patience_var, width=8).grid(row=0, column=6, sticky=tk.W)
+        
+        ttk.Label(advanced_frame, text="最小时间(s):").grid(row=0, column=7, sticky=tk.W, padx=(10, 5))
+        self.minwin_var = tk.StringVar(value="0.6")
+        ttk.Entry(advanced_frame, textvariable=self.minwin_var, width=8).grid(row=0, column=8, sticky=tk.W)
+        
+        # Idle门控和频率细调
+        self.idle_var = tk.BooleanVar(value=False)
+        ttk.Checkbutton(advanced_frame, text="Idle门控", variable=self.idle_var).grid(row=1, column=0, sticky=tk.W)
+        
+        ttk.Label(advanced_frame, text="Idle r1阈值:").grid(row=1, column=1, sticky=tk.W, padx=(10, 5))
+        self.idle_rmin_var = tk.StringVar(value="0.50")
+        ttk.Entry(advanced_frame, textvariable=self.idle_rmin_var, width=8).grid(row=1, column=2, sticky=tk.W)
+        
+        ttk.Label(advanced_frame, text="Idle差距阈值:").grid(row=1, column=3, sticky=tk.W, padx=(10, 5))
+        self.idle_margin_var = tk.StringVar(value="0.12")
+        ttk.Entry(advanced_frame, textvariable=self.idle_margin_var, width=8).grid(row=1, column=4, sticky=tk.W)
+        
+        self.freq_tune_var = tk.BooleanVar(value=False)
+        ttk.Checkbutton(advanced_frame, text="频率细调", variable=self.freq_tune_var).grid(row=1, column=5, sticky=tk.W, padx=(10, 0))
+        
         # 单项运行区域
         single_frame = ttk.LabelFrame(main_frame, text="单项运行", padding="10")
         single_frame.grid(row=2, column=0, sticky=(tk.W, tk.E), pady=(0, 10))
         
         ttk.Button(single_frame, text="运行解码器", command=self.run_decoder).grid(row=0, column=0, padx=(0, 5))
         ttk.Button(single_frame, text="运行刺激端", command=self.run_stimulus).grid(row=0, column=1, padx=(5, 5))
-        ttk.Button(single_frame, text="一键运行当前配置", command=self.run_current).grid(row=0, column=2, padx=(5, 5))
-        ttk.Button(single_frame, text="停止所有", command=self.stop_all).grid(row=0, column=3, padx=(5, 0))
+        ttk.Button(single_frame, text="运行通道QC", command=self.run_channel_qc).grid(row=0, column=2, padx=(5, 5))
+        ttk.Button(single_frame, text="一键运行当前配置", command=self.run_current).grid(row=0, column=3, padx=(5, 5))
+        ttk.Button(single_frame, text="停止所有", command=self.stop_all).grid(row=0, column=4, padx=(5, 0))
         
         # 批量运行区域
         batch_frame = ttk.LabelFrame(main_frame, text="批量运行", padding="10")
@@ -218,21 +259,85 @@ class BCIRunner:
         dir_path = filedialog.askdirectory(initialdir=self.logdir_var.get())
         if dir_path:
             self.logdir_var.set(dir_path)
+    
+    def run_channel_qc(self):
+        """运行通道QC"""
+        if hasattr(self, 'qc_process') and self.qc_process and self.qc_process.poll() is None:
+            self.log("通道QC已在运行")
+            return
+            
+        try:
+            qc_cmd = self.create_conda_cmd([
+                "python", "analysis/quick_qc_psd.py",
+                "--dur", "15",
+                "--freqs", "10,12,15,20",
+                "--out", "data/logs/qc"
+            ])
+            
+            self.log("启动通道QC...")
+            self.log(f"命令: {' '.join(qc_cmd)}")
+            
+            self.qc_process = subprocess.Popen(
+                qc_cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                universal_newlines=True,
+                bufsize=1
+            )
+            
+            # 启动线程监控输出
+            threading.Thread(target=self.monitor_qc, daemon=True).start()
+            
+        except Exception as e:
+            self.log(f"启动通道QC失败: {e}")
+            messagebox.showerror("错误", f"启动通道QC失败: {e}")
+    
+    def monitor_qc(self):
+        """监控QC输出"""
+        if not hasattr(self, 'qc_process') or not self.qc_process:
+            return
+            
+        try:
+            for line in iter(self.qc_process.stdout.readline, ''):
+                if line:
+                    self.log(f"[QC] {line.strip()}")
+                    
+            self.qc_process.stdout.close()
+            self.qc_process.wait()
+            self.log("通道QC完成")
+            
+            # 显示结果
+            try:
+                qc_result_path = "data/logs/qc/selected_chs.txt"
+                if os.path.exists(qc_result_path):
+                    with open(qc_result_path, 'r') as f:
+                        selected_chs = f.read().strip()
+                    self.log(f"选中的通道: {selected_chs}")
+                    self.log(f"QC报告: data/logs/qc/qc_report.png")
+                else:
+                    self.log("警告: 未找到QC结果文件")
+            except Exception as e:
+                self.log(f"读取QC结果失败: {e}")
+            
+        except Exception as e:
+            self.log(f"QC监控错误: {e}")
             
     def ensure_logdir(self):
         """确保日志目录存在"""
         logdir = Path(self.logdir_var.get())
         logdir.mkdir(parents=True, exist_ok=True)
         
-    def get_decoder_cmd(self, window, vote, channels, logfile):
+    def get_decoder_cmd(self, window, vote, channels, logfile=None, runname=None):
         """生成解码器命令"""
         decoder = self.decoder_var.get()
         notch = self.notch_var.get()
         
         if decoder == "CCA+":
             script = "online/online_cca.py"
-        else:
+        elif decoder == "FBCCA":
             script = "online/online_fbcca.py"
+        else:  # Hybrid
+            script = "online/online_hybrid.py"
             
         python_cmd = [
             "python", script,
@@ -240,11 +345,38 @@ class BCIRunner:
             "--vote", str(vote),
             "--freqs", "10,12,15,20",
             "--notch", notch,
-            "--latlog", logfile
+            "--outdir", self.logdir_var.get()
         ]
         
+        if runname:
+            python_cmd.extend(["--runname", runname])
+        
+        if logfile:
+            python_cmd.extend(["--latlog", logfile])
+        
+        # 通道选择逻辑
         if channels == "subset":
             python_cmd.extend(["--chs", "2,3,6,7"])
+        elif channels == "auto":
+            python_cmd.append("--auto_chs")
+            
+        # 添加早停参数
+        if self.earlystop_var.get():
+            python_cmd.append("--earlystop")
+            python_cmd.extend(["--rmin", self.rmin_var.get()])
+            python_cmd.extend(["--margin", self.margin_var.get()])
+            python_cmd.extend(["--patience", self.patience_var.get()])
+            python_cmd.extend(["--minwin", self.minwin_var.get()])
+        
+        # 添加Idle门控参数
+        if self.idle_var.get():
+            python_cmd.append("--idle")
+            python_cmd.extend(["--idle_rmin", self.idle_rmin_var.get()])
+            python_cmd.extend(["--idle_margin", self.idle_margin_var.get()])
+        
+        # 添加频率细调参数
+        if self.freq_tune_var.get():
+            python_cmd.append("--freq_tune")
             
         return self.create_conda_cmd(python_cmd)
         
@@ -279,12 +411,33 @@ class BCIRunner:
             self.ensure_logdir()
             window = float(self.window_var.get())
             vote = int(self.vote_var.get())
-            channels = "subset" if self.channel_var.get() == "子集通道" else "all"
-            logfile = self.get_logfile_name(window, vote, channels)
+            channel_mode = self.channel_var.get()
+            if channel_mode == "子集通道":
+                channels = "subset"
+            elif channel_mode == "自动(QC)":
+                channels = "auto"
+            else:
+                channels = "all"
             
-            cmd = self.get_decoder_cmd(window, vote, channels, logfile)
+            # 生成run名称
+            subject = self.subject_var.get()
+            decoder = self.decoder_var.get()
+            window_str = f"w{window:.1f}".replace(".", "p")
+            channels_str = "_allch" if channels == "all" else ""
+            runname = f"{subject}_{decoder}_{window_str}_v{vote}{channels_str}"
+            
+            cmd = self.get_decoder_cmd(window, vote, channels, runname=runname)
             self.log(f"启动解码器: {self.decoder_var.get()}, 窗口: {window}s, 投票: {vote}")
             self.log(f"命令: {' '.join(cmd)}")
+            
+            # 保存run信息以便后续分析
+            self.current_run_info = {
+                "runname": runname,
+                "decoder": decoder,
+                "window": window,
+                "vote": vote,
+                "channels": channels
+            }
             
             self.decoder_process = subprocess.Popen(
                 cmd, 
@@ -398,8 +551,61 @@ class BCIRunner:
             self.decoder_process.wait()
             self.log("解码器进程结束")
             
+            # 解码器结束后自动运行数据分析
+            if hasattr(self, 'current_run_info'):
+                self.run_analysis_for_current_run()
+            
         except Exception as e:
             self.log(f"解码器监控错误: {e}")
+            
+    def run_analysis_for_current_run(self):
+        """为当前run运行数据分析"""
+        try:
+            if not hasattr(self, 'current_run_info'):
+                return
+                
+            runname = self.current_run_info['runname']
+            csv_path = os.path.join(self.logdir_var.get(), runname, "latency.csv")
+            
+            if not os.path.exists(csv_path):
+                self.log(f"警告: 找不到CSV文件 {csv_path}")
+                return
+                
+            self.log("开始自动数据分析...")
+            
+            # 运行数据分析
+            analysis_cmd = self.create_conda_cmd([
+                "python", "analysis/compute_metrics.py",
+                "--csv", csv_path,
+                "--classes", "10,12,15,20",
+                "--selection_time", "3.0"
+            ])
+            
+            analysis_process = subprocess.Popen(
+                analysis_cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                universal_newlines=True
+            )
+            
+            # 等待分析完成并显示输出
+            stdout, _ = analysis_process.communicate()
+            if stdout:
+                for line in stdout.split('\n'):
+                    if line.strip():
+                        self.log(f"[分析] {line.strip()}")
+                        
+            if analysis_process.returncode == 0:
+                self.log(f"数据分析完成! 结果保存在: {os.path.dirname(csv_path)}")
+                run_dir = os.path.dirname(csv_path)
+                self.log(f"  - metrics.xlsx: {os.path.join(run_dir, 'metrics.xlsx')}")
+                self.log(f"  - confmat.png: {os.path.join(run_dir, 'confmat.png')}")
+                self.log(f"  - latency_hist.png: {os.path.join(run_dir, 'latency_hist.png')}")
+            else:
+                self.log("数据分析失败")
+                
+        except Exception as e:
+            self.log(f"自动数据分析错误: {e}")
             
     def monitor_stimulus(self):
         """监控刺激端输出"""
@@ -492,11 +698,27 @@ class BCIRunner:
                 
                 # 运行当前配置
                 self.ensure_logdir()
-                logfile = self.get_logfile_name(config["window"], config["vote"], config["channels"])
+                
+                # 生成run名称
+                subject = self.subject_var.get()
+                decoder = config["decoder"]
+                window_str = f"w{config['window']:.1f}".replace(".", "p")
+                channels_str = "_allch" if config["channels"] == "all" else ""
+                timestamp = datetime.now().strftime('%Y%m%d-%H%M%S')
+                runname = f"{subject}_{decoder}_{window_str}_v{config['vote']}{channels_str}_{timestamp}"
                 
                 # 启动解码器
-                cmd = self.get_decoder_cmd(config["window"], config["vote"], config["channels"], logfile)
+                cmd = self.get_decoder_cmd(config["window"], config["vote"], config["channels"], runname=runname)
                 self.decoder_process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True)
+                
+                # 保存当前run信息
+                self.current_run_info = {
+                    "runname": runname,
+                    "decoder": config["decoder"],
+                    "window": config["window"],
+                    "vote": config["vote"],
+                    "channels": config["channels"]
+                }
                 
                 time.sleep(2)  # 等待解码器启动
                 
